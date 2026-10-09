@@ -218,3 +218,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Additional files and directories to ignore here
+**/test.py
+**/test.md
