@@ -1,3 +1,5 @@
+"""Module to define the Pydantic models for representing the content."""
+
 from pydantic import BaseModel, Field
 
 

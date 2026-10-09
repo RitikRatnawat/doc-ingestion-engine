@@ -1,3 +1,5 @@
+"""Module for extracting text and metadata from HTML content and converting it to markdown."""
+
 from __future__ import annotations
 
 import json
