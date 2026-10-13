@@ -101,7 +101,7 @@ class PageExtracter:
 
         # Handling Admonitions like Key points, Stick notes, etc,
         for box in main_content.select("div.admonition, .admonition"):
-            title = box.select_one("admonition-title")
+            title = box.select_one(".admonition-title")
             label = title.get_text(strip=True) if title else "Note"
 
             if title:
