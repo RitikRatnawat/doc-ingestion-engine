@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify as md
@@ -78,6 +79,40 @@ class PageExtracter:
         # If no main content is found, return the entire body
         return soup.body or soup
 
+    def remove_noise(self, main_content: BeautifulSoup, base_url: str) -> None:
+        """Remove unnecessary elements and noise from the content
+
+        Args:
+            main_content (BeautifulSoup): Extracted Main Content
+        """
+
+        # Remove noise elements from the main content
+        for selector in self.__noise_candidates:
+            for noise in main_content.select(selector):
+                noise.decompose()
+
+        # Resolving the relative urls
+        for a in main_content.select("a[href]"):
+            a["href"] = urljoin(base_url, a["href"])
+
+        # Cleaning up the Images, wll be handled separately
+        for img in main_content.select("img"):
+            img.decompose()
+
+        # Handling Admonitions like Key points, Stick notes, etc,
+        for box in main_content.select("div.admonition, .admonition"):
+            title = box.select_one("admonition-title")
+            label = title.get_text(strip=True) if title else "Note"
+
+            if title:
+                title.decompose()
+
+            box.replace_with(
+                BeautifulSoup(
+                    f"<blockquote><strong>{label}:</strong> {box.get_text(' ', strip=True)}</blockquote>", "lxml"
+                ).blockquote
+            )
+
     def extract(self, html: str, base_url: str) -> Page:
         """Extract text and metadata from the given HTML content and convert it to markdown.
 
@@ -94,11 +129,7 @@ class PageExtracter:
         title = title_tag.get_text(" ", strip=True) if title_tag else base_url
 
         main_content = self._get_main_content(soup)
-
-        # Remove noise elements from the main content
-        for selector in self.__noise_candidates:
-            for noise in main_content.select(selector):
-                noise.decompose()
+        self.remove_noise(main_content, base_url)
 
         # Convert the cleaned main content to markdown
         markdown = md(
