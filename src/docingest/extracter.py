@@ -79,11 +79,11 @@ class PageExtracter:
         # If no main content is found, return the entire body
         return soup.body or soup
 
-    def remove_noise(self, main_content: BeautifulSoup, base_url: str) -> None:
+    def remove_noise(self, main_content: Tag, base_url: str) -> None:
         """Remove unnecessary elements and noise from the content
 
         Args:
-            main_content (BeautifulSoup): Extracted Main Content
+            main_content (Tag): Extracted Main Content
         """
 
         # Remove noise elements from the main content
@@ -93,7 +93,7 @@ class PageExtracter:
 
         # Resolving the relative urls
         for a in main_content.select("a[href]"):
-            a["href"] = urljoin(base_url, a["href"])
+            a["href"] = str(urljoin(base_url, str(a["href"])))
 
         # Cleaning up the Images, wll be handled separately
         for img in main_content.select("img"):
