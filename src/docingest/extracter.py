@@ -9,6 +9,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify as md
 
+from .logger import logger
 from .models import Page
 
 
@@ -18,9 +19,11 @@ class PageExtracter:
     def __init__(self) -> None:
         """Constructor for the PageExtracter class."""
 
+        logger.debug("Initializing PageExtracter and loading configuration from 'config/extracter.json'.")
         with open("config/extracter.json") as f:
             self.config = json.load(f)
 
+        logger.debug("Configuration loaded successfully.")
         self.__main_candidates = self.config.get("MAIN_CANDIDATES", [])
         self.__noise_candidates = self.config.get("NOISE_CANDIDATES", [])
 
@@ -35,6 +38,8 @@ class PageExtracter:
         """
 
         # Get all the nodes
+        logger.debug(f"Extracting code language from <pre> tag: {pre}")
+
         nodes: list[Tag] = []
         for node in [
             pre.parent.parent if pre.parent and pre.parent.parent else None,
@@ -59,6 +64,7 @@ class PageExtracter:
                 return language
 
         # If no language class is found, return an empty string
+        logger.debug("No code language found in <pre> tag.")
         return ""
 
     def _get_main_content(self, soup: BeautifulSoup) -> Tag:
@@ -71,12 +77,14 @@ class PageExtracter:
             Tag: A BeautifulSoup Tag object representing the main content of the webpage.
         """
 
+        logger.debug("Extracting main content from the webpage.")
         for selector in self.__main_candidates:
             main_content = soup.select_one(selector)
             if main_content:
                 return main_content
 
         # If no main content is found, return the entire body
+        logger.debug("No main content found using the configured selectors. Returning the entire body.")
         return soup.body or soup
 
     def remove_noise(self, main_content: Tag, base_url: str) -> None:
@@ -87,19 +95,23 @@ class PageExtracter:
         """
 
         # Remove noise elements from the main content
+        logger.debug("Removing noise elements from the main content.")
         for selector in self.__noise_candidates:
             for noise in main_content.select(selector):
                 noise.decompose()
 
         # Resolving the relative urls
+        logger.debug("Resolving relative URLs in the main content.")
         for a in main_content.select("a[href]"):
             a["href"] = str(urljoin(base_url, str(a["href"])))
 
         # Cleaning up the Images, wll be handled separately
+        logger.debug("Removing images from the main content.")
         for img in main_content.select("img"):
             img.decompose()
 
         # Handling Admonitions like Key points, Stick notes, etc,
+        logger.debug("Handling admonitions in the main content.")
         for box in main_content.select("div.admonition, .admonition"):
             title = box.select_one(".admonition-title")
             label = title.get_text(strip=True) if title else "Note"
@@ -124,14 +136,21 @@ class PageExtracter:
             Page: A Page object containing the extracted text, metadata, and markdown content.
         """
 
+        logger.info(f"Extracting content for the Webpage: {base_url}")
         soup = BeautifulSoup(html, "lxml")
+
+        logger.info("Extracting title from the Webpage.")
         title_tag = soup.find("title") or soup.find("h1")
         title = title_tag.get_text(" ", strip=True) if title_tag else base_url
+        logger.debug(f"Extracted title: {title}")
 
+        logger.info("Extracting main content from the Webpage.")
         main_content = self._get_main_content(soup)
         self.remove_noise(main_content, base_url)
+        logger.debug("Noise removed and main content cleaned.")
 
         # Convert the cleaned main content to markdown
+        logger.info("Converting main content to markdown.")
         markdown = md(
             str(main_content),
             heading_style="ATX",
@@ -140,5 +159,6 @@ class PageExtracter:
         )
         markdown = re.sub(r"\n{3,}", "\n\n", markdown).strip()
         markdown = re.sub(r"¶", "", markdown).strip()
+        logger.debug("Markdown conversion completed.")
 
         return Page(title=title, url=base_url, markdown=markdown)
